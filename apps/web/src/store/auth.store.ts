@@ -4,43 +4,77 @@ import Cookies from 'js-cookie'
 
 interface User {
   id: string
-  name: string
   email: string
-  accountCategory: string
+  name: string
   accountType: string
+  accountCategory: string
   emailVerified: boolean
-  status: string
+  plan?: string
+  avatar?: string
 }
 
 interface AuthState {
   user: User | null
+  accessToken: string | null
+  isLoading: boolean
   isAuthenticated: boolean
   setUser: (user: User, token: string) => void
   clearAuth: () => void
-  updateUser: (updates: Partial<User>) => void
+  logout: () => Promise<void>
+  updateUser: (user: Partial<User>) => void
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
+      accessToken: null,
+      isLoading: false,
       isAuthenticated: false,
 
       setUser: (user, token) => {
         Cookies.set('accessToken', token, { expires: 1 })
-        set({ user, isAuthenticated: true })
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('accessToken', token)
+        }
+        set({ user, accessToken: token, isAuthenticated: true })
       },
 
       clearAuth: () => {
         Cookies.remove('accessToken')
-        set({ user: null, isAuthenticated: false })
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('accessToken')
+        }
+        set({ user: null, accessToken: null, isAuthenticated: false })
       },
 
-      updateUser: (updates) =>
-        set((state) => ({
-          user: state.user ? { ...state.user, ...updates } : null,
-        })),
+      logout: async () => {
+        try {
+          const token = Cookies.get('accessToken')
+          if (token) {
+            await fetch(`${process.env.NEXT_PUBLIC_AUTH_URL}/api/v1/auth/logout`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+            })
+          }
+        } catch {}
+        Cookies.remove('accessToken')
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('accessToken')
+        }
+        set({ user: null, accessToken: null, isAuthenticated: false })
+      },
+
+      updateUser: (userData) =>
+        set((state) => ({ user: state.user ? { ...state.user, ...userData } : null })),
     }),
-    { name: 'yoyzie-auth' }
+    {
+      name: 'auth-storage',
+      partialize: (state) => ({
+        user: state.user,
+        accessToken: state.accessToken,
+        isAuthenticated: state.isAuthenticated,
+      }),
+    }
   )
 )

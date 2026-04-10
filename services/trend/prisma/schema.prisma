@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountCategory {
+  INDIVIDUAL
+  INFLUENCER
+  BUSINESS
+}
+
+enum AccountType {
+  INDIVIDUAL_PRO
+  CREATOR
+  POWER_USER
+  INFLUENCER_FREE
+  INFLUENCER_STARTER
+  INFLUENCER_PRO
+  CREATOR_MODE
+  SME
+  GROWING_BUSINESS
+  ENTERPRISE
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+  DELETED
+}
+
+enum OAuthProvider {
+  GOOGLE
+  APPLE
+}
+
+model User {
+  id                    String          @id @default(uuid())
+  email                 String          @unique
+  name                  String
+  passwordHash          String?
+  accountCategory       AccountCategory
+  accountType           AccountType
+  status                UserStatus      @default(PENDING_VERIFICATION)
+  emailVerified         Boolean         @default(false)
+  emailVerifyToken      String?
+  emailVerifyExpiry     DateTime?
+  passwordResetToken    String?
+  passwordResetExpiry   DateTime?
+  twoFactorEnabled      Boolean         @default(false)
+  twoFactorSecret       String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  oauthAccounts         OAuthAccount[]
+  refreshTokens         RefreshToken[]
+  sessions              UserSession[]
+
+  @@map("users")
+}
+
+model OAuthAccount {
+  id                String        @id @default(uuid())
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  createdAt         DateTime      @default(now())
+
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model UserSession {
+  id         String   @id @default(uuid())
+  userId     String
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+enum TrendPlatform {
+  TWITTER
+  INSTAGRAM
+  TIKTOK
+  GENERAL
+}
+
+enum TrendCategory {
+  HASHTAG
+  SOUND
+  TOPIC
+  CHALLENGE
+}
+
+model Trend {
+  id            String        @id @default(uuid())
+  platform      TrendPlatform
+  category      TrendCategory
+  name          String
+  description   String?
+  tweetVolume   Int?
+  postVolume    Int?
+  rank          Int?
+  location      String        @default("Kenya")
+  county        String?
+  url           String?
+  isActive      Boolean       @default(true)
+  detectedAt    DateTime      @default(now())
+  expiresAt     DateTime?
+
+  @@unique([platform, name, location])
+  @@map("trends")
+}
+
+model TrendSuggestion {
+  id          String        @id @default(uuid())
+  userId      String
+  platform    TrendPlatform
+  content     String
+  suggestions Json
+  tokensUsed  Int?
+  createdAt   DateTime      @default(now())
+
+  @@map("trend_suggestions")
+}
+
+model TrendRefreshLog {
+  id          String        @id @default(uuid())
+  platform    TrendPlatform
+  trendsFound Int
+  success     Boolean
+  error       String?
+  refreshedAt DateTime      @default(now())
+
+  @@map("trend_refresh_logs")
+}

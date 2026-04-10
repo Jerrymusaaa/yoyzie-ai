@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountCategory {
+  INDIVIDUAL
+  INFLUENCER
+  BUSINESS
+}
+
+enum AccountType {
+  INDIVIDUAL_PRO
+  CREATOR
+  POWER_USER
+  INFLUENCER_FREE
+  INFLUENCER_STARTER
+  INFLUENCER_PRO
+  CREATOR_MODE
+  SME
+  GROWING_BUSINESS
+  ENTERPRISE
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+  DELETED
+}
+
+enum OAuthProvider {
+  GOOGLE
+  APPLE
+}
+
+model User {
+  id                    String          @id @default(uuid())
+  email                 String          @unique
+  name                  String
+  passwordHash          String?
+  accountCategory       AccountCategory
+  accountType           AccountType
+  status                UserStatus      @default(PENDING_VERIFICATION)
+  emailVerified         Boolean         @default(false)
+  emailVerifyToken      String?
+  emailVerifyExpiry     DateTime?
+  passwordResetToken    String?
+  passwordResetExpiry   DateTime?
+  twoFactorEnabled      Boolean         @default(false)
+  twoFactorSecret       String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  oauthAccounts         OAuthAccount[]
+  refreshTokens         RefreshToken[]
+  sessions              UserSession[]
+
+  @@map("users")
+}
+
+model OAuthAccount {
+  id                String        @id @default(uuid())
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  createdAt         DateTime      @default(now())
+
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model UserSession {
+  id         String   @id @default(uuid())
+  userId     String
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+enum NotificationType {
+  CAMPAIGN_APPLICATION
+  CAMPAIGN_ACCEPTED
+  CAMPAIGN_REJECTED
+  CAMPAIGN_COMPLETED
+  CAMPAIGN_MESSAGE
+  CAMPAIGN_MILESTONE
+  CAMPAIGN_DISPUTE
+  PAYMENT_RECEIVED
+  PAYMENT_SENT
+  WITHDRAWAL_PROCESSED
+  WITHDRAWAL_FAILED
+  SUBSCRIPTION_ACTIVATED
+  SUBSCRIPTION_EXPIRING
+  SUBSCRIPTION_EXPIRED
+  BOT_REPORT_READY
+  SYSTEM_ANNOUNCEMENT
+  REVIEW_RECEIVED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+}
+
+model Notification {
+  id          String             @id @default(uuid())
+  userId      String
+  type        NotificationType
+  title       String
+  body        String
+  data        Json?
+  channel     NotificationChannel @default(IN_APP)
+  isRead      Boolean            @default(false)
+  readAt      DateTime?
+  emailSent   Boolean            @default(false)
+  emailSentAt DateTime?
+  createdAt   DateTime           @default(now())
+
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id          String             @id @default(uuid())
+  userId      String             @unique
+  emailEnabled Boolean           @default(true)
+  inAppEnabled Boolean           @default(true)
+  campaignUpdates Boolean        @default(true)
+  paymentAlerts Boolean          @default(true)
+  marketingEmails Boolean        @default(false)
+  weeklyDigest Boolean           @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@map("notification_preferences")
+}
+
+model Announcement {
+  id          String   @id @default(uuid())
+  title       String
+  body        String
+  targetAll   Boolean  @default(true)
+  targetType  String?
+  isActive    Boolean  @default(true)
+  expiresAt   DateTime?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  @@map("announcements")
+}

@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountCategory {
+  INDIVIDUAL
+  INFLUENCER
+  BUSINESS
+}
+
+enum AccountType {
+  INDIVIDUAL_PRO
+  CREATOR
+  POWER_USER
+  INFLUENCER_FREE
+  INFLUENCER_STARTER
+  INFLUENCER_PRO
+  CREATOR_MODE
+  SME
+  GROWING_BUSINESS
+  ENTERPRISE
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+  DELETED
+}
+
+enum OAuthProvider {
+  GOOGLE
+  APPLE
+}
+
+model User {
+  id                    String          @id @default(uuid())
+  email                 String          @unique
+  name                  String
+  passwordHash          String?
+  accountCategory       AccountCategory
+  accountType           AccountType
+  status                UserStatus      @default(PENDING_VERIFICATION)
+  emailVerified         Boolean         @default(false)
+  emailVerifyToken      String?
+  emailVerifyExpiry     DateTime?
+  passwordResetToken    String?
+  passwordResetExpiry   DateTime?
+  twoFactorEnabled      Boolean         @default(false)
+  twoFactorSecret       String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  oauthAccounts         OAuthAccount[]
+  refreshTokens         RefreshToken[]
+  sessions              UserSession[]
+
+  @@map("users")
+}
+
+model OAuthAccount {
+  id                String        @id @default(uuid())
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  createdAt         DateTime      @default(now())
+
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model UserSession {
+  id         String   @id @default(uuid())
+  userId     String
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+  COMMISSION
+  WITHDRAWAL
+  ESCROW_HOLD
+  ESCROW_RELEASE
+  REFUND
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum WithdrawalMethod {
+  MPESA
+  PAYPAL
+  BANK
+}
+
+enum EscrowStatus {
+  HELD
+  RELEASED
+  REFUNDED
+  DISPUTED
+}
+
+model Wallet {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  balance         Float    @default(0)
+  pendingBalance  Float    @default(0)
+  totalEarned     Float    @default(0)
+  totalWithdrawn  Float    @default(0)
+  currency        String   @default("KES")
+  mpesaNumber     String?
+  paypalEmail     String?
+  bankName        String?
+  bankAccount     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  transactions    WalletTransaction[]
+
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id               String            @id @default(uuid())
+  walletId         String
+  userId           String
+  type             TransactionType
+  amount           Float
+  fee              Float             @default(0)
+  netAmount        Float
+  currency         String            @default("KES")
+  status           TransactionStatus @default(PENDING)
+  description      String?
+  campaignId       String?
+  withdrawalMethod WithdrawalMethod?
+  mpesaNumber      String?
+  paypalEmail      String?
+  mpesaReceiptNo   String?
+  paypalOrderId    String?
+  externalRef      String?
+  failureReason    String?
+  requiresReview   Boolean           @default(false)
+  reviewedBy       String?
+  reviewedAt       DateTime?
+  processedAt      DateTime?
+  createdAt        DateTime          @default(now())
+
+  wallet           Wallet            @relation(fields: [walletId], references: [id])
+
+  @@map("wallet_transactions")
+}
+
+model Escrow {
+  id             String       @id @default(uuid())
+  campaignId     String       @unique
+  companyUserId  String
+  influencerId   String?
+  amount         Float
+  currency       String       @default("KES")
+  status         EscrowStatus @default(HELD)
+  heldAt         DateTime     @default(now())
+  releasedAt     DateTime?
+  refundedAt     DateTime?
+  transactionRef String?
+
+  @@map("escrows")
+}

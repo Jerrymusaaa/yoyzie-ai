@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountCategory {
+  INDIVIDUAL
+  INFLUENCER
+  BUSINESS
+}
+
+enum AccountType {
+  INDIVIDUAL_PRO
+  CREATOR
+  POWER_USER
+  INFLUENCER_FREE
+  INFLUENCER_STARTER
+  INFLUENCER_PRO
+  CREATOR_MODE
+  SME
+  GROWING_BUSINESS
+  ENTERPRISE
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+  DELETED
+}
+
+enum OAuthProvider {
+  GOOGLE
+  APPLE
+}
+
+model User {
+  id                    String          @id @default(uuid())
+  email                 String          @unique
+  name                  String
+  passwordHash          String?
+  accountCategory       AccountCategory
+  accountType           AccountType
+  status                UserStatus      @default(PENDING_VERIFICATION)
+  emailVerified         Boolean         @default(false)
+  emailVerifyToken      String?
+  emailVerifyExpiry     DateTime?
+  passwordResetToken    String?
+  passwordResetExpiry   DateTime?
+  twoFactorEnabled      Boolean         @default(false)
+  twoFactorSecret       String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  oauthAccounts         OAuthAccount[]
+  refreshTokens         RefreshToken[]
+  sessions              UserSession[]
+
+  @@map("users")
+}
+
+model OAuthAccount {
+  id                String        @id @default(uuid())
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  createdAt         DateTime      @default(now())
+
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model UserSession {
+  id         String   @id @default(uuid())
+  userId     String
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  TIKTOK
+  LINKEDIN
+  TWITTER
+  FACEBOOK
+  YOUTUBE
+}
+
+enum CampaignStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum CampaignCategory {
+  TECH
+  FASHION
+  FOOD
+  FINANCE
+  HEALTH
+  ENTERTAINMENT
+  BEAUTY
+  TRAVEL
+  SPORTS
+  EDUCATION
+  LIFESTYLE
+  AUTOMOTIVE
+  REAL_ESTATE
+  OTHER
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  SYSTEM
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+model Campaign {
+  id                    String           @id @default(uuid())
+  companyUserId         String
+  title                 String
+  description           String
+  budget                Float
+  currency              String           @default("KES")
+  platforms             SocialPlatform[]
+  category              CampaignCategory
+  niche                 String?
+  deliverables          String[]
+  timeline              Int
+  targetAudienceAge     String?
+  targetAudienceLocation String?
+  minFollowers          Int              @default(0)
+  maxBudget             Float?
+  status                CampaignStatus   @default(DRAFT)
+  applicationsCount     Int              @default(0)
+  selectedInfluencerId  String?
+  escrowFunded          Boolean          @default(false)
+  escrowAmount          Float?
+  completedAt           DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  applications          CampaignApplication[]
+  messages              CampaignMessage[]
+  milestones            CampaignMilestone[]
+  disputes              CampaignDispute[]
+
+  @@map("campaigns")
+}
+
+model CampaignApplication {
+  id              String            @id @default(uuid())
+  campaignId      String
+  influencerId    String
+  proposalText    String
+  proposedRate    Float
+  estimatedReach  Int?
+  portfolioLinks  String[]
+  status          ApplicationStatus @default(PENDING)
+  appliedAt       DateTime          @default(now())
+  respondedAt     DateTime?
+
+  campaign        Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, influencerId])
+  @@map("campaign_applications")
+}
+
+model CampaignMessage {
+  id          String      @id @default(uuid())
+  campaignId  String
+  senderId    String
+  content     String
+  messageType MessageType @default(TEXT)
+  fileUrl     String?
+  readAt      DateTime?
+  createdAt   DateTime    @default(now())
+
+  campaign    Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("campaign_messages")
+}
+
+model CampaignMilestone {
+  id          String   @id @default(uuid())
+  campaignId  String
+  title       String
+  description String?
+  dueDate     DateTime?
+  amount      Float?
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("campaign_milestones")
+}
+
+model CampaignDispute {
+  id          String        @id @default(uuid())
+  campaignId  String
+  raisedBy    String
+  reason      String
+  description String
+  status      DisputeStatus @default(OPEN)
+  resolution  String?
+  resolvedAt  DateTime?
+  createdAt   DateTime      @default(now())
+
+  campaign    Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("campaign_disputes")
+}
+
+model CampaignReview {
+  id          String   @id @default(uuid())
+  campaignId  String
+  reviewerId  String
+  revieweeId  String
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  @@unique([campaignId, reviewerId])
+  @@map("campaign_reviews")
+}

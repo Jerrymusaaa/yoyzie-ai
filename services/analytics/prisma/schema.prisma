@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountCategory {
+  INDIVIDUAL
+  INFLUENCER
+  BUSINESS
+}
+
+enum AccountType {
+  INDIVIDUAL_PRO
+  CREATOR
+  POWER_USER
+  INFLUENCER_FREE
+  INFLUENCER_STARTER
+  INFLUENCER_PRO
+  CREATOR_MODE
+  SME
+  GROWING_BUSINESS
+  ENTERPRISE
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+  DELETED
+}
+
+enum OAuthProvider {
+  GOOGLE
+  APPLE
+}
+
+model User {
+  id                    String          @id @default(uuid())
+  email                 String          @unique
+  name                  String
+  passwordHash          String?
+  accountCategory       AccountCategory
+  accountType           AccountType
+  status                UserStatus      @default(PENDING_VERIFICATION)
+  emailVerified         Boolean         @default(false)
+  emailVerifyToken      String?
+  emailVerifyExpiry     DateTime?
+  passwordResetToken    String?
+  passwordResetExpiry   DateTime?
+  twoFactorEnabled      Boolean         @default(false)
+  twoFactorSecret       String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  oauthAccounts         OAuthAccount[]
+  refreshTokens         RefreshToken[]
+  sessions              UserSession[]
+
+  @@map("users")
+}
+
+model OAuthAccount {
+  id                String        @id @default(uuid())
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  createdAt         DateTime      @default(now())
+
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model UserSession {
+  id         String   @id @default(uuid())
+  userId     String
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  TIKTOK
+  LINKEDIN
+  TWITTER
+  FACEBOOK
+  YOUTUBE
+}
+
+model PostMetric {
+  id              String         @id @default(uuid())
+  userId          String
+  platform        SocialPlatform
+  externalPostId  String
+  impressions     Int            @default(0)
+  reach           Int            @default(0)
+  likes           Int            @default(0)
+  comments        Int            @default(0)
+  shares          Int            @default(0)
+  saves           Int            @default(0)
+  clicks          Int            @default(0)
+  videoViews      Int            @default(0)
+  engagementRate  Float          @default(0)
+  clickToViewRate Float          @default(0)
+  recordedAt      DateTime       @default(now())
+  createdAt       DateTime       @default(now())
+
+  @@unique([userId, platform, externalPostId, recordedAt])
+  @@map("post_metrics")
+}
+
+model AccountMetric {
+  id              String         @id @default(uuid())
+  userId          String
+  platform        SocialPlatform
+  followers       Int            @default(0)
+  following       Int            @default(0)
+  posts           Int            @default(0)
+  totalReach      Int            @default(0)
+  totalImpressions Int           @default(0)
+  avgEngagementRate Float        @default(0)
+  recordedAt      DateTime       @default(now())
+
+  @@map("account_metrics")
+}
+
+model BotDetectionReport {
+  id                              String         @id @default(uuid())
+  userId                          String
+  platform                        SocialPlatform
+  botScore                        Float
+  realFollowerPct                 Float
+  engagementAuthenticityPct       Float
+  suspiciousFollowerGrowth        Boolean        @default(false)
+  commentQualityScore             Float
+  crossPlatformConsistencyScore   Float
+  reportData                      Json
+  lastAnalyzedAt                  DateTime       @default(now())
+
+  @@unique([userId, platform])
+  @@map("bot_detection_reports")
+}
+
+model ClickEvent {
+  id          String         @id @default(uuid())
+  userId      String
+  platform    SocialPlatform
+  postId      String
+  clickType   String
+  referrer    String?
+  userAgent   String?
+  ipHash      String?
+  clickedAt   DateTime       @default(now())
+
+  @@map("click_events")
+}
+
+model AudienceDemographic {
+  id          String         @id @default(uuid())
+  userId      String
+  platform    SocialPlatform
+  ageRange    String
+  gender      String
+  location    String
+  percentage  Float
+  recordedAt  DateTime       @default(now())
+
+  @@map("audience_demographics")
+}
+
+model AnalyticsReport {
+  id          String   @id @default(uuid())
+  userId      String
+  reportType  String
+  period      String
+  summary     String
+  insights    Json
+  generatedAt DateTime @default(now())
+
+  @@map("analytics_reports")
+}
